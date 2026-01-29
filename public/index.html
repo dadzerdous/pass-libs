@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pass-Libs</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <h1>Pass-Libs</h1>
+        
+        <div id="view-menu">
+            <button onclick="createGame('sfw')" class="btn-primary">New Game (SFW)</button>
+            <button onclick="createGame('nsfw')" class="btn-danger">New Game (18+)</button>
+            <br><br>
+            <input type="text" id="room-code-input" placeholder="ENTER ROOM CODE">
+            <button onclick="joinGame()" class="btn-secondary">Join Game</button>
+        </div>
+
+        <div id="view-game" class="hidden">
+            <h2 id="room-display">Room: ????</h2>
+            <div class="card">
+                <p>It is your turn to add:</p>
+                <h3 id="prompt-display">...</h3>
+                <input type="text" id="word-input" placeholder="Type here...">
+                <button onclick="submitWord()" class="btn-primary">Submit</button>
+            </div>
+            <p id="status-display">Waiting for turn...</p>
+        </div>
+
+        <div id="view-result" class="hidden">
+            <h2>The Story</h2>
+            <div id="story-content" class="story-box"></div>
+            <button onclick="location.reload()" class="btn-secondary">Play Again</button>
+        </div>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
