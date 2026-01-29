@@ -11,11 +11,21 @@
     <div class="app-container">
         <h1>Pass-Libs</h1>
         
-        <div id="view-menu">
+<div id="view-menu">
+            <h3>How many players?</h3>
+            <select id="player-count-select">
+                <option value="1">1 Player (Solo)</option>
+                <option value="2" selected>2 Players</option>
+                <option value="3">3 Players</option>
+                <option value="4">4 Players</option>
+            </select>
+            <br><br>
             <button onclick="createGame('sfw')" class="btn-primary">New Game (SFW)</button>
             <button onclick="createGame('nsfw')" class="btn-danger">New Game (18+)</button>
-            <br><br>
-            <input type="text" id="room-code-input" placeholder="ENTER ROOM CODE">
+            
+            <hr>
+            
+            <input type="text" id="room-code-input" placeholder="ENTER 4-LETTER CODE">
             <button onclick="joinGame()" class="btn-secondary">Join Game</button>
         </div>
 
