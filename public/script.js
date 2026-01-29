@@ -1,10 +1,9 @@
 let currentRoom = null;
-// Generate a permanent ID for this browser tab
 const myPlayerId = localStorage.getItem('pid') || Math.random().toString(36).substring(7);
 localStorage.setItem('pid', myPlayerId);
 
 async function api(endpoint, data = {}) {
-    data.playerId = myPlayerId; // Always send who we are
+    data.playerId = myPlayerId; 
     return fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -13,7 +12,8 @@ async function api(endpoint, data = {}) {
 }
 
 async function createGame(mode) {
-    const res = await api('/api/create', { mode });
+    const count = document.getElementById('player-count-select').value;
+    const res = await api('/api/create', { mode, maxPlayers: count });
     if (res.success) enterGame(res.roomCode);
 }
 
@@ -32,33 +32,38 @@ function enterGame(roomCode) {
     document.getElementById('view-game').classList.remove('hidden');
     document.getElementById('room-display').innerText = `Room: ${roomCode}`;
     pollGame();
-    setInterval(pollGame, 2000); // Check server every 2 seconds
+    setInterval(pollGame, 2000); 
 }
 
 async function pollGame() {
     if (!currentRoom) return;
-    const res = await fetch(`/api/game/${currentRoom}`).then(r => r.json());
+    
+    // Note: We append ?playerId to the URL so the server knows who is asking
+    const res = await fetch(`/api/game/${currentRoom}?playerId=${myPlayerId}`).then(r => r.json());
 
     if (res.status === 'finished') {
         showResult(res.completedText);
     } else {
-        // TURN LOGIC
-        const isMyTurn = (res.currentPlayerId === myPlayerId);
-        const inputContainer = document.getElementById('input-area');
-        const waitMessage = document.getElementById('wait-message');
+        updateGameUI(res);
+    }
+}
 
-        if (isMyTurn) {
-            // It IS my turn: Show inputs
-            inputContainer.classList.remove('hidden');
-            waitMessage.classList.add('hidden');
-            document.getElementById('prompt-display').innerText = `Your Turn! Enter a: ${res.currentBlank.toUpperCase()}`;
-        } else {
-            // It is NOT my turn: Hide inputs
-            inputContainer.classList.add('hidden');
-            waitMessage.classList.remove('hidden');
-            waitMessage.innerText = `Waiting for other player...`;
-            document.getElementById('prompt-display').innerText = `(Their turn to pick a ${res.currentBlank})`;
-        }
+function updateGameUI(state) {
+    const inputArea = document.getElementById('input-area');
+    const waitMsg = document.getElementById('wait-message');
+    const prompt = document.getElementById('prompt-display');
+
+    if (state.hasSubmitted) {
+        // I have submitted. Waiting for others.
+        inputArea.classList.add('hidden');
+        waitMsg.classList.remove('hidden');
+        waitMsg.innerText = `Waiting for players... (${state.submittedCount}/${state.maxPlayers})`;
+        prompt.innerText = "Submitted!";
+    } else {
+        // I need to submit.
+        inputArea.classList.remove('hidden');
+        waitMsg.classList.add('hidden');
+        prompt.innerText = `Enter a: ${state.currentBlank.toUpperCase()}`;
     }
 }
 
@@ -69,9 +74,7 @@ async function submitWord() {
     const res = await api('/api/submit', { roomCode: currentRoom, word });
     if (res.success) {
         document.getElementById('word-input').value = '';
-        pollGame(); // Update screen immediately
-    } else {
-        alert(res.error || "Error");
+        pollGame(); // Update UI immediately to show wait screen
     }
 }
 
