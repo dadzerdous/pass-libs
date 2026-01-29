@@ -9,7 +9,10 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static('public')); // Serves the frontend
+
+// --- FIX IS HERE: Serve files from BOTH locations ---
+app.use(express.static('public'));      // Look in 'public' folder first
+app.use(express.static(__dirname));     // Then look in the main folder (root)
 
 // --- DATA STORAGE (In-Memory for MVP) ---
 const games = {};
@@ -46,10 +49,9 @@ function generateRoomCode() {
 
 // 1. Create a Game
 app.post('/api/create', (req, res) => {
-    const { mode } = req.body; // 'sfw' or 'nsfw'
+    const { mode } = req.body; 
     const roomCode = generateRoomCode();
     
-    // Select a random template based on mode
     const category = mode === 'nsfw' ? TEMPLATES.nsfw : TEMPLATES.sfw;
     const selectedTemplate = category[Math.floor(Math.random() * category.length)];
 
@@ -59,8 +61,8 @@ app.post('/api/create', (req, res) => {
         template: selectedTemplate,
         currentBlankIndex: 0,
         answers: [],
-        status: 'playing', // 'playing' or 'finished'
-        history: [] // Log of who did what
+        status: 'playing',
+        history: [] 
     };
 
     res.json({ roomCode, success: true });
@@ -73,7 +75,6 @@ app.get('/api/game/:code', (req, res) => {
         return res.status(404).json({ error: "Game not found" });
     }
     
-    // Logic to show just the current blank
     const currentBlank = game.template.blanks[game.currentBlankIndex];
     
     res.json({
@@ -94,11 +95,9 @@ app.post('/api/submit', (req, res) => {
         return res.status(400).json({ error: "Invalid move" });
     }
 
-    // Save answer
     game.answers.push(word);
     game.currentBlankIndex++;
 
-    // Check if finished
     if (game.currentBlankIndex >= game.template.blanks.length) {
         game.status = 'finished';
     }
@@ -110,9 +109,6 @@ app.post('/api/submit', (req, res) => {
 function compileStory(game) {
     let story = game.template.text;
     game.answers.forEach(answer => {
-        // Simple replace for the first occurring brace set
-        // Note: Real production code needs a more robust regex, 
-        // but this works for sequential simple replacements
         story = story.replace(/\{.*?\}/, `<b>${answer}</b>`);
     });
     return story;
