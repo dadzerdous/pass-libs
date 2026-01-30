@@ -12,15 +12,23 @@ async function api(endpoint, data = {}) {
 }
 
 async function createGame(mode) {
+    const name = document.getElementById('player-name-input').value;
+    if (!name) return alert("Please enter your name!");
+
     const count = document.getElementById('player-count-select').value;
-    const res = await api('/api/create', { mode, maxPlayers: count });
+    // Send name AND maxPlayers
+    const res = await api('/api/create', { mode, maxPlayers: count, playerName: name });
     if (res.success) enterGame(res.roomCode);
 }
 
 async function joinGame() {
+    const name = document.getElementById('player-name-input').value;
+    if (!name) return alert("Please enter your name!");
+
     const code = document.getElementById('room-code-input').value.toUpperCase();
     if (code.length === 4) {
-        const res = await api('/api/join', { roomCode: code });
+        // Send name
+        const res = await api('/api/join', { roomCode: code, playerName: name });
         if (res.success) enterGame(code);
         else alert("Room not found");
     }
@@ -52,37 +60,20 @@ function updateGameUI(state) {
     const inputArea = document.getElementById('input-area');
     const waitMsg = document.getElementById('wait-message');
     const prompt = document.getElementById('prompt-display');
-    const status = document.getElementById('status-display');
 
-    if (state.phase === 'submit') {
-        if (state.hasSubmitted) {
-            inputArea.classList.add('hidden');
-            waitMsg.classList.remove('hidden');
-            waitMsg.innerText = `Waiting… (${state.submittedCount}/${state.maxPlayers})`;
-            prompt.innerText = "Submitted!";
-            status.innerText = "Others are typing…";
-        } else {
-            inputArea.classList.remove('hidden');
-            waitMsg.classList.add('hidden');
-            prompt.innerText = `Enter a: ${state.currentBlank.toUpperCase()}`;
-            status.innerText = "Your turn";
-        }
-    }
-
-    if (state.phase === 'reveal') {
+    if (state.hasSubmitted) {
+        // I have submitted. Waiting for others.
         inputArea.classList.add('hidden');
+        waitMsg.classList.remove('hidden');
+        waitMsg.innerText = `Waiting for players... (${state.submittedCount}/${state.maxPlayers})`;
+        prompt.innerText = "Submitted!";
+    } else {
+        // I need to submit.
+        inputArea.classList.remove('hidden');
         waitMsg.classList.add('hidden');
-
-        prompt.innerHTML = `
-            <div>
-                <h3>Round Results</h3>
-                ${state.submissions.map(w => `<div>• ${w}</div>`).join('')}
-            </div>
-        `;
-        status.innerText = "😂 Locking it in…";
+        prompt.innerText = `Enter a: ${state.currentBlank.toUpperCase()}`;
     }
 }
-
 
 async function submitWord() {
     const word = document.getElementById('word-input').value;
