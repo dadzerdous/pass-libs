@@ -16,7 +16,6 @@ async function createGame(mode) {
     if (!name) return alert("Please enter your name!");
 
     const count = document.getElementById('player-count-select').value;
-    // Send name AND maxPlayers
     const res = await api('/api/create', { mode, maxPlayers: count, playerName: name });
     if (res.success) enterGame(res.roomCode);
 }
@@ -27,7 +26,6 @@ async function joinGame() {
 
     const code = document.getElementById('room-code-input').value.toUpperCase();
     if (code.length === 4) {
-        // Send name
         const res = await api('/api/join', { roomCode: code, playerName: name });
         if (res.success) enterGame(code);
         else alert("Room not found");
@@ -45,8 +43,6 @@ function enterGame(roomCode) {
 
 async function pollGame() {
     if (!currentRoom) return;
-    
-    // Note: We append ?playerId to the URL so the server knows who is asking
     const res = await fetch(`/api/game/${currentRoom}?playerId=${myPlayerId}`).then(r => r.json());
 
     if (res.status === 'finished') {
@@ -58,21 +54,50 @@ async function pollGame() {
 
 function updateGameUI(state) {
     const inputArea = document.getElementById('input-area');
+    const votingArea = document.getElementById('voting-area');
     const waitMsg = document.getElementById('wait-message');
     const prompt = document.getElementById('prompt-display');
 
-    if (state.hasSubmitted) {
-        // I have submitted. Waiting for others.
-        inputArea.classList.add('hidden');
-        waitMsg.classList.remove('hidden');
-        waitMsg.innerText = `Waiting for players... (${state.submittedCount}/${state.maxPlayers})`;
-        prompt.innerText = "Submitted!";
-    } else {
-        // I need to submit.
-        inputArea.classList.remove('hidden');
-        waitMsg.classList.add('hidden');
-        prompt.innerText = `Enter a: ${state.currentBlank.toUpperCase()}`;
+    // HIDE ALL INITIALLY
+    inputArea.classList.add('hidden');
+    votingArea.classList.add('hidden');
+    waitMsg.classList.add('hidden');
+
+    if (state.phase === 'writing') {
+        // --- WRITING PHASE ---
+        if (state.hasSubmitted) {
+            waitMsg.classList.remove('hidden');
+            waitMsg.innerText = `Waiting for players... (${state.submittedCount}/${state.maxPlayers})`;
+            prompt.innerText = "Submitted!";
+        } else {
+            inputArea.classList.remove('hidden');
+            prompt.innerText = `Enter a: ${state.currentBlank.toUpperCase()}`;
+        }
+    } else if (state.phase === 'voting') {
+        // --- VOTING PHASE ---
+        prompt.innerText = "Vote for your favorite!";
+        
+        if (state.hasVoted) {
+            waitMsg.classList.remove('hidden');
+            waitMsg.innerText = `Waiting for votes... (${state.voteCount}/${state.maxPlayers})`;
+        } else {
+            votingArea.classList.remove('hidden');
+            renderCandidates(state.candidates);
+        }
     }
+}
+
+function renderCandidates(candidates) {
+    const list = document.getElementById('candidates-list');
+    list.innerHTML = ''; // Clear old buttons
+    
+    candidates.forEach((word, index) => {
+        const btn = document.createElement('button');
+        btn.innerText = word;
+        btn.className = 'btn-secondary'; // Use gray style for options
+        btn.onclick = () => submitVote(index);
+        list.appendChild(btn);
+    });
 }
 
 async function submitWord() {
@@ -82,7 +107,14 @@ async function submitWord() {
     const res = await api('/api/submit', { roomCode: currentRoom, word });
     if (res.success) {
         document.getElementById('word-input').value = '';
-        pollGame(); // Update UI immediately to show wait screen
+        pollGame(); 
+    }
+}
+
+async function submitVote(index) {
+    const res = await api('/api/vote', { roomCode: currentRoom, candidateIndex: index });
+    if (res.success) {
+        pollGame();
     }
 }
 
