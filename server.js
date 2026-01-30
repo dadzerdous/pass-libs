@@ -99,22 +99,11 @@ app.post('/api/submit', (req, res) => {
     game.roundSubmissions.push({ playerId, word });
 
     // CHECK: Did everyone submit?
-    if (game.roundSubmissions.length >= game.maxPlayers) {
-        // 1. Pick a random winner (V1 logic)
-        const winner = game.roundSubmissions[Math.floor(Math.random() * game.roundSubmissions.length)];
-        
-        // 2. Lock it in
-        game.answers.push(winner.word);
-        
-        // 3. Reset for next round
-        game.roundSubmissions = [];
-        game.currentBlankIndex++;
+if (game.roundSubmissions.length >= game.maxPlayers) {
+    game.phase = 'reveal';
+    game.revealUntil = Date.now() + 4000; // 4 second laugh window
+}
 
-        // 4. Check for Game Over
-        if (game.currentBlankIndex >= game.template.blanks.length) {
-            game.status = 'finished';
-        }
-    }
 
     res.json({ success: true });
 });
