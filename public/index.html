@@ -11,27 +11,34 @@
     <div class="app-container">
         <h1>Pass-Libs</h1>
         
-<div id="view-menu">
-            <h3>How many players?</h3>
+        <div id="view-menu">
+            <h3>1. Who are you?</h3>
+            <input type="text" id="player-name-input" placeholder="Enter Your Name">
+            
+            <hr>
+
+            <h3>2. Start New Game</h3>
+            <label>Players:</label>
             <select id="player-count-select">
-                <option value="1">1 Player (Solo)</option>
+                <option value="1">1 Player</option>
                 <option value="2" selected>2 Players</option>
                 <option value="3">3 Players</option>
                 <option value="4">4 Players</option>
             </select>
             <br><br>
-            <button onclick="createGame('sfw')" class="btn-primary">New Game (SFW)</button>
-            <button onclick="createGame('nsfw')" class="btn-danger">New Game (18+)</button>
+            <button onclick="createGame('sfw')" class="btn-primary">Create SFW Game</button>
+            <button onclick="createGame('nsfw')" class="btn-danger">Create 18+ Game</button>
             
             <hr>
             
-            <input type="text" id="room-code-input" placeholder="ENTER 4-LETTER CODE">
+            <h3>OR Join Game</h3>
+            <input type="text" id="room-code-input" placeholder="4-LETTER CODE">
             <button onclick="joinGame()" class="btn-secondary">Join Game</button>
         </div>
 
         <div id="view-game" class="hidden">
             <h2 id="room-display">Room: ????</h2>
-<div class="card">
+            <div class="card">
                 <h3 id="prompt-display">Loading...</h3>
                 
                 <div id="input-area">
@@ -41,7 +48,6 @@
 
                 <p id="wait-message" class="hidden">Waiting...</p>
             </div>
-            <p id="status-display">Waiting for turn...</p>
         </div>
 
         <div id="view-result" class="hidden">
