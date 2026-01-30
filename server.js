@@ -30,19 +30,22 @@ app.post('/api/create', (req, res) => {
     const roomCode = generateId();
     const category = mode === 'nsfw' ? TEMPLATES.nsfw : TEMPLATES.sfw;
     
-    games[roomCode] = {
-        id: roomCode,
-        mode: mode,
-        template: category[Math.floor(Math.random() * category.length)],
-        maxPlayers: parseInt(maxPlayers) || 2, // Default to 2 if missing
-        players: [playerId],
-        
-        // Game State
-        currentBlankIndex: 0,
-        status: 'playing',
-        answers: [],            // Accepted answers for the story
-        roundSubmissions: []    // Temporary holding spot for current round
-    };
+games[roomCode] = {
+    id: roomCode,
+    mode,
+    template: category[Math.floor(Math.random() * category.length)],
+    maxPlayers: parseInt(maxPlayers) || 2,
+    players: [playerId],
+
+    currentBlankIndex: 0,
+    status: 'playing',
+    phase: 'submit', // submit | reveal | finished
+    revealUntil: null,
+
+    answers: [],
+    roundSubmissions: []
+};
+
 
     res.json({ roomCode, success: true });
 });
