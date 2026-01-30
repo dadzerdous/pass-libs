@@ -1,170 +1,93 @@
-// server.js
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.static('public'));
 app.use(express.static(__dirname));
 
-/* ------------------------------
-   In-memory game store
--------------------------------- */
 const games = {};
 
-/* ------------------------------
-   Templates
--------------------------------- */
 const TEMPLATES = {
     sfw: [
-        {
-            title: "The Bakery",
-            text: "I bought a {adjective} {noun}. The baker told me to {verb} away.",
-            blanks: ["adjective", "noun", "verb"]
-        },
-        {
-            title: "Zoo Trip",
-            text: "The {animal} was looking very {adjective} today.",
-            blanks: ["animal", "adjective"]
-        }
+        { title: "The Bakery", text: "I bought a {adjective} {noun}. The baker told me to {verb} away.", blanks: ["adjective", "noun", "verb"] },
+        { title: "Zoo Trip", text: "The {animal} was looking very {adjective} today.", blanks: ["animal", "adjective"] }
     ],
     nsfw: [
-        {
-            title: "Date Night",
-            text: "My date pulled out a {adjective} {noun}. I immediately {verb}.",
-            blanks: ["adjective", "noun", "verb"]
-        }
+        { title: "Date Night", text: "My date pulled out a {adjective} {noun}. I immediately {verb}.", blanks: ["adjective", "noun", "verb"] }
     ]
 };
 
-/* ------------------------------
-   Helpers
--------------------------------- */
-function generateId() {
-    return Math.random().toString(36).substring(2, 6).toUpperCase();
-}
+function generateId() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
 
-function compileStory(game) {
-    let story = game.template.text;
-    game.answers.forEach(a => {
-        story = story.replace(/\{.*?\}/, `<b>${a}</b>`);
-    });
-    return story;
-}
+// --- API ---
 
-/* ------------------------------
-   API: CREATE GAME
--------------------------------- */
 app.post('/api/create', (req, res) => {
-    const { mode, playerId, maxPlayers } = req.body;
+    const { mode, playerId, playerName, maxPlayers } = req.body;
     const roomCode = generateId();
-
     const category = mode === 'nsfw' ? TEMPLATES.nsfw : TEMPLATES.sfw;
-    const template = category[Math.floor(Math.random() * category.length)];
-
+    
     games[roomCode] = {
         id: roomCode,
-        mode,
-        template,
+        mode: mode,
+        template: category[Math.floor(Math.random() * category.length)],
         maxPlayers: parseInt(maxPlayers) || 2,
         players: [playerId],
-
-        status: 'playing',
-        phase: 'submit',          // submit | reveal | finished
-        revealUntil: null,
-
+        names: { [playerId]: playerName }, // MAP ID TO NAME
+        
         currentBlankIndex: 0,
-        answers: [],
-        roundSubmissions: []
+        status: 'playing',
+        answers: [],            
+        roundSubmissions: []    
     };
 
-    res.json({ success: true, roomCode });
+    res.json({ roomCode, success: true });
 });
 
-/* ------------------------------
-   API: JOIN GAME
--------------------------------- */
 app.post('/api/join', (req, res) => {
-    const { roomCode, playerId } = req.body;
+    const { roomCode, playerId, playerName } = req.body;
     const game = games[roomCode];
-
-    if (!game) {
-        return res.json({ success: false, error: "Game not found" });
-    }
+    if (!game) return res.json({ success: false, error: "Game not found" });
 
     if (!game.players.includes(playerId)) {
         game.players.push(playerId);
+        // If they provide a name, save it. If they are re-joining, keep old name.
+        if (playerName) {
+            game.names[playerId] = playerName;
+        }
     }
-
     res.json({ success: true });
 });
 
-/* ------------------------------
-   API: GAME STATE (POLL)
--------------------------------- */
 app.get('/api/game/:code', (req, res) => {
     const game = games[req.params.code];
-    if (!game) {
-        return res.status(404).json({ error: "Game not found" });
-    }
-
+    if (!game) return res.status(404).json({ error: "Game not found" });
+    
     const playerId = req.query.playerId;
-    const hasSubmitted = game.roundSubmissions.some(
-        s => s.playerId === playerId
-    );
-
-    // 🔥 RESOLVE REVEAL PHASE HERE
-    if (game.phase === 'reveal' && Date.now() > game.revealUntil) {
-        const winner =
-            game.roundSubmissions[
-                Math.floor(Math.random() * game.roundSubmissions.length)
-            ];
-
-        game.answers.push(winner.word);
-        game.roundSubmissions = [];
-        game.currentBlankIndex++;
-        game.revealUntil = null;
-        game.phase = 'submit';
-
-        if (game.currentBlankIndex >= game.template.blanks.length) {
-            game.status = 'finished';
-            game.phase = 'finished';
-        }
-    }
+    const hasSubmitted = game.roundSubmissions.some(s => s.playerId === playerId);
 
     res.json({
         status: game.status,
-        phase: game.phase,
-
         currentBlank: game.template.blanks[game.currentBlankIndex],
         progress: game.currentBlankIndex,
         totalBlanks: game.template.blanks.length,
-
-        completedText:
-            game.status === 'finished' ? compileStory(game) : null,
-
+        completedText: game.status === 'finished' ? compileStory(game) : null,
+        
         connectedPlayers: game.players.length,
         maxPlayers: game.maxPlayers,
         submittedCount: game.roundSubmissions.length,
-        hasSubmitted,
-
-        submissions: game.roundSubmissions.map(s => s.word)
+        hasSubmitted: hasSubmitted
     });
 });
 
-/* ------------------------------
-   API: SUBMIT WORD
--------------------------------- */
 app.post('/api/submit', (req, res) => {
     const { roomCode, word, playerId } = req.body;
     const game = games[roomCode];
 
-    if (!game || game.status !== 'playing' || game.phase !== 'submit') {
-        return res.status(400).json({ success: false });
-    }
+    if (!game || game.status !== 'playing') return res.status(400).json({ error: "Invalid" });
 
     if (game.roundSubmissions.some(s => s.playerId === playerId)) {
         return res.json({ success: false, error: "Already submitted" });
@@ -172,18 +95,33 @@ app.post('/api/submit', (req, res) => {
 
     game.roundSubmissions.push({ playerId, word });
 
-    // 🔥 MOVE TO REVEAL PHASE
     if (game.roundSubmissions.length >= game.maxPlayers) {
-        game.phase = 'reveal';
-        game.revealUntil = Date.now() + 4000; // 4 seconds to laugh
+        // Pick Winner
+        const winner = game.roundSubmissions[Math.floor(Math.random() * game.roundSubmissions.length)];
+        
+        // SAVE WORD + AUTHOR ID
+        game.answers.push({ word: winner.word, authorId: winner.playerId });
+        
+        game.roundSubmissions = [];
+        game.currentBlankIndex++;
+
+        if (game.currentBlankIndex >= game.template.blanks.length) {
+            game.status = 'finished';
+        }
     }
 
     res.json({ success: true });
 });
 
-/* ------------------------------
-   START SERVER
--------------------------------- */
-app.listen(PORT, () => {
-    console.log(`Pass-Libs server running on port ${PORT}`);
-});
+function compileStory(game) {
+    let story = game.template.text;
+    game.answers.forEach(entry => {
+        const authorName = game.names[entry.authorId] || "Unknown";
+        // Create the HTML: "Word (Name)"
+        const replacement = `<b>${entry.word} <span style="font-size:0.6em; color:#f1c40f;">(${authorName})</span></b>`;
+        story = story.replace(/\{.*?\}/, replacement);
+    });
+    return story;
+}
+
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
