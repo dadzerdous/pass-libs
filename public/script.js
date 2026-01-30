@@ -52,20 +52,37 @@ function updateGameUI(state) {
     const inputArea = document.getElementById('input-area');
     const waitMsg = document.getElementById('wait-message');
     const prompt = document.getElementById('prompt-display');
+    const status = document.getElementById('status-display');
 
-    if (state.hasSubmitted) {
-        // I have submitted. Waiting for others.
+    if (state.phase === 'submit') {
+        if (state.hasSubmitted) {
+            inputArea.classList.add('hidden');
+            waitMsg.classList.remove('hidden');
+            waitMsg.innerText = `Waiting… (${state.submittedCount}/${state.maxPlayers})`;
+            prompt.innerText = "Submitted!";
+            status.innerText = "Others are typing…";
+        } else {
+            inputArea.classList.remove('hidden');
+            waitMsg.classList.add('hidden');
+            prompt.innerText = `Enter a: ${state.currentBlank.toUpperCase()}`;
+            status.innerText = "Your turn";
+        }
+    }
+
+    if (state.phase === 'reveal') {
         inputArea.classList.add('hidden');
-        waitMsg.classList.remove('hidden');
-        waitMsg.innerText = `Waiting for players... (${state.submittedCount}/${state.maxPlayers})`;
-        prompt.innerText = "Submitted!";
-    } else {
-        // I need to submit.
-        inputArea.classList.remove('hidden');
         waitMsg.classList.add('hidden');
-        prompt.innerText = `Enter a: ${state.currentBlank.toUpperCase()}`;
+
+        prompt.innerHTML = `
+            <div>
+                <h3>Round Results</h3>
+                ${state.submissions.map(w => `<div>• ${w}</div>`).join('')}
+            </div>
+        `;
+        status.innerText = "😂 Locking it in…";
     }
 }
+
 
 async function submitWord() {
     const word = document.getElementById('word-input').value;
