@@ -46,7 +46,7 @@ function generateId() { return Math.random().toString(36).substring(2, 6).toUppe
 // --- API ENDPOINTS ---
 
 app.post('/api/create', async (req, res) => {
-    const { mode, playerId, playerName, maxPlayers, isPublic } = req.body; // Added isPublic
+    const { mode, playerId, playerName, maxPlayers, isPublic } = req.body;
     const roomCode = generateId();
     const category = (mode === 'nsfw' && TEMPLATES.nsfw) ? TEMPLATES.nsfw : TEMPLATES.sfw;
     
@@ -62,7 +62,7 @@ app.post('/api/create', async (req, res) => {
         players: [playerId],
         names: { [playerId]: playerName || "You" },
         hostId: playerId,
-        isPublic: !!isPublic, // Save the flag (true/false)
+        isPublic: !!isPublic,
         
         currentBlankIndex: 0,
         status: 'playing',
@@ -79,20 +79,17 @@ app.post('/api/create', async (req, res) => {
     res.json({ roomCode, success: true });
 });
 
-// NEW: Get list of Public Games
 app.get('/api/list', async (req, res) => {
     try {
-        // Find games that are Public AND in the Lobby
         const snapshot = await db.collection('games')
             .where('isPublic', '==', true)
             .where('phase', '==', 'lobby')
-            .limit(10) // Only show top 10 to keep it fast
+            .limit(10)
             .get();
 
         const gamesList = [];
         snapshot.forEach(doc => {
             const g = doc.data();
-            // Only show if there is room to join
             if (g.players.length < g.maxPlayers) {
                 gamesList.push({
                     roomCode: g.id,
@@ -110,6 +107,7 @@ app.get('/api/list', async (req, res) => {
         res.json({ success: false, error: "Could not fetch games" });
     }
 });
+
 app.post('/api/join', async (req, res) => {
     const { roomCode, playerId, playerName } = req.body;
     const gameRef = db.collection('games').doc(roomCode);
@@ -118,33 +116,35 @@ app.post('/api/join', async (req, res) => {
     if (!doc.exists) return res.json({ success: false, error: "Game not found" });
     let game = doc.data();
 
-    // Logic: Add player
-    if (!game.players.includes(playerId)) {
+    // Rejoin Logic: If player is already in list, just say success
+    if (game.players.includes(playerId)) {
+        return res.json({ success: true, rejoined: true });
+    }
+
+    // New Join Logic
+    if (game.phase === 'lobby' && game.players.length < game.maxPlayers) {
         game.players.push(playerId);
         if (playerName) game.names[playerId] = playerName;
         
-        // Auto-start check
-        if (game.phase === 'lobby' && game.players.length >= game.maxPlayers) {
+        if (game.players.length >= game.maxPlayers) {
             game.phase = 'writing';
         }
         
-        // Update DB
         await gameRef.update({
             players: game.players,
             names: game.names,
             phase: game.phase
         });
+        return res.json({ success: true });
     }
-
-    res.json({ success: true });
+    
+    res.json({ success: false, error: "Room full or started" });
 });
 
 app.post('/api/start', async (req, res) => {
     const { roomCode } = req.body;
     const gameRef = db.collection('games').doc(roomCode);
-    await gameRef.update({
-        phase: 'writing'
-    });
+    await gameRef.update({ phase: 'writing' });
     res.json({ success: true });
 });
 
@@ -182,6 +182,15 @@ app.get('/api/game/:code', async (req, res) => {
     const hasSubmitted = game.roundSubmissions ? game.roundSubmissions.some(s => s.playerId === playerId) : false;
     const hasVoted = game.roundVotes ? (game.roundVotes[playerId] !== undefined) : false;
 
+    // Generate Masked Story (For Context Mode)
+    let maskedStory = game.template.text;
+    // 1. Fill in past answers
+    game.answers.forEach(a => {
+        maskedStory = maskedStory.replace(/\{.*?\}/, `<b>${a.word}</b>`);
+    });
+    // 2. Mask future blanks
+    maskedStory = maskedStory.replace(/\{.*?\}/g, "_______");
+
     res.json({
         status: game.status,
         phase: game.phase,
@@ -189,6 +198,7 @@ app.get('/api/game/:code', async (req, res) => {
         progress: game.currentBlankIndex,
         totalBlanks: game.template.blanks.length,
         completedText: game.status === 'finished' ? compileStory(game) : null,
+        maskedStory: maskedStory, // <--- NEW: Send the partial story
         
         connectedPlayers: game.players.length,
         maxPlayers: game.maxPlayers,
@@ -278,11 +288,13 @@ app.post('/api/vote', async (req, res) => {
     res.json({ success: true });
 });
 
+// COLOR FIX: Changed #f1c40f (Yellow) to #8e44ad (Purple)
 function compileStory(game) {
     let story = game.template.text;
     game.answers.forEach(entry => {
         const authorName = entry.authorId === 'CPU' ? "🤖 Bot" : (game.names[entry.authorId] || "Unknown");
-        const replacement = `<b>${entry.word} <span style="font-size:0.6em; color:#f1c40f;">(${authorName})</span></b>`;
+        // FIXED COLOR HERE vvv
+        const replacement = `<b>${entry.word} <span style="font-size:0.6em; color:#8e44ad;">(${authorName})</span></b>`;
         story = story.replace(/\{.*?\}/, replacement);
     });
     return story;
