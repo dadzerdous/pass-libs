@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const fs = require('fs'); // NEW: File System module
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -11,19 +12,19 @@ app.use(express.static(__dirname));
 
 const games = {};
 
-const TEMPLATES = {
-    sfw: [
-        { title: "The Bakery", text: "I bought a {adjective} {noun}. The baker told me to {verb} away.", blanks: ["adjective", "noun", "verb"] },
-        { title: "Zoo Trip", text: "The {animal} was looking very {adjective} today.", blanks: ["animal", "adjective"] },
-        { title: "The Tech CEO", text: "I invented a new App called {noun} that tracks your {noun}. It is worth {number} dollars.", blanks: ["noun", "noun", "number"] }
-    ],
-    nsfw: [
-        { title: "Date Night", text: "My date pulled out a {adjective} {noun}. I immediately {verb}.", blanks: ["adjective", "noun", "verb"] },
-        { title: "HR Violation", text: "I was fired for bringing a {adjective} {noun} to the office party.", blanks: ["adjective", "noun"] }
-    ]
-};
+// --- LOAD TEMPLATES FROM FILE ---
+let TEMPLATES = {};
+try {
+    const data = fs.readFileSync('templates.json', 'utf8');
+    TEMPLATES = JSON.parse(data);
+    console.log("Templates loaded successfully.");
+} catch (err) {
+    console.error("Error loading templates:", err);
+    // Fallback if file missing
+    TEMPLATES = { sfw: [], nsfw: [] }; 
+}
 
-const CPU_VOCAB = ["spatula", "moist", "grandma", "explosion", "slippery", "banana", "slime", "awkward", "shiny", "wiggly"];
+const CPU_VOCAB = ["SPATULA", "MOIST", "GRANDMA", "EXPLOSION", "SLIPPERY", "BANANA", "SLIME", "AWKWARD", "SHINY", "WIGGLY"];
 
 function generateId() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
 
@@ -32,9 +33,14 @@ function generateId() { return Math.random().toString(36).substring(2, 6).toUppe
 app.post('/api/create', (req, res) => {
     const { mode, playerId, playerName, maxPlayers } = req.body;
     const roomCode = generateId();
-    const category = mode === 'nsfw' ? TEMPLATES.nsfw : TEMPLATES.sfw;
+    // Default to SFW if mode invalid
+    const category = (mode === 'nsfw' && TEMPLATES.nsfw) ? TEMPLATES.nsfw : TEMPLATES.sfw;
     
-    // SINGLE PLAYER: Skip Lobby, default name if missing
+    // Safety check if templates are empty
+    if (!category || category.length === 0) {
+        return res.json({ success: false, error: "No templates found!" });
+    }
+
     const isSinglePlayer = parseInt(maxPlayers) === 1;
     const initialPhase = isSinglePlayer ? 'writing' : 'lobby';
     
@@ -45,7 +51,7 @@ app.post('/api/create', (req, res) => {
         maxPlayers: parseInt(maxPlayers) || 2,
         players: [playerId],
         names: { [playerId]: playerName || "You" },
-        hostId: playerId, // Track who created it
+        hostId: playerId,
         
         currentBlankIndex: 0,
         status: 'playing',
@@ -70,7 +76,6 @@ app.post('/api/join', (req, res) => {
         if (playerName) game.names[playerId] = playerName;
     }
 
-    // AUTO-START if full
     if (game.phase === 'lobby' && game.players.length >= game.maxPlayers) {
         game.phase = 'writing';
     }
@@ -78,27 +83,23 @@ app.post('/api/join', (req, res) => {
     res.json({ success: true });
 });
 
-// FORCE START (New!)
 app.post('/api/start', (req, res) => {
     const { roomCode } = req.body;
     const game = games[roomCode];
     if (game) {
-        game.phase = 'writing'; // Force start
-        game.maxPlayers = game.players.length; // Lock in current player count
+        game.phase = 'writing';
+        game.maxPlayers = game.players.length; 
     }
     res.json({ success: true });
 });
 
-// REPLAY (New!)
 app.post('/api/replay', (req, res) => {
     const { roomCode } = req.body;
     const game = games[roomCode];
     if (game) {
-        // Pick new template
         const category = game.mode === 'nsfw' ? TEMPLATES.nsfw : TEMPLATES.sfw;
         game.template = category[Math.floor(Math.random() * category.length)];
         
-        // Reset State
         game.currentBlankIndex = 0;
         game.status = 'playing';
         game.phase = 'writing';
@@ -129,7 +130,7 @@ app.get('/api/game/:code', (req, res) => {
         connectedPlayers: game.players.length,
         maxPlayers: game.maxPlayers,
         playerNames: Object.values(game.names),
-        isHost: game.hostId === playerId, // Tell client if they are the boss
+        isHost: game.hostId === playerId, 
         
         submittedCount: game.roundSubmissions.length,
         hasSubmitted: hasSubmitted,
@@ -140,26 +141,24 @@ app.get('/api/game/:code', (req, res) => {
 });
 
 app.post('/api/submit', (req, res) => {
-    const { roomCode, word, playerId } = req.body;
+    let { roomCode, word, playerId } = req.body;
     const game = games[roomCode];
     if (!game || game.status !== 'playing' || game.phase !== 'writing') return res.status(400).json({ error: "Invalid" });
     if (game.roundSubmissions.some(s => s.playerId === playerId)) return res.json({ success: false, error: "Already submitted" });
 
+    // --- FIX: FORCE UPPERCASE & TRIM ---
+    word = word.trim().toUpperCase(); 
+
     game.roundSubmissions.push({ playerId, word });
     
-    // Check if we should move to voting
-    // Single player: Move instantly
-    // Multiplayer: Move when everyone submitted
     if (game.roundSubmissions.length >= game.maxPlayers) {
         if (game.maxPlayers === 1) {
-             // Single Player -> Skip voting, just save it
              const entry = game.roundSubmissions[0];
              game.answers.push({ word: entry.word, authorId: entry.playerId });
              game.currentBlankIndex++;
              game.roundSubmissions = [];
              if (game.currentBlankIndex >= game.template.blanks.length) game.status = 'finished';
         } else {
-             // Multiplayer -> Go to voting
              game.phase = 'voting';
              const cpuWord = CPU_VOCAB[Math.floor(Math.random() * CPU_VOCAB.length)];
              game.roundSubmissions.push({ playerId: 'CPU', word: cpuWord });
@@ -200,6 +199,7 @@ function compileStory(game) {
     let story = game.template.text;
     game.answers.forEach(entry => {
         const authorName = entry.authorId === 'CPU' ? "🤖 Bot" : (game.names[entry.authorId] || "Unknown");
+        // Styling matches Uppercase vibe
         const replacement = `<b>${entry.word} <span style="font-size:0.6em; color:#f1c40f;">(${authorName})</span></b>`;
         story = story.replace(/\{.*?\}/, replacement);
     });
