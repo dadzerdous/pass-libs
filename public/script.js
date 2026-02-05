@@ -14,14 +14,65 @@ async function api(endpoint, data = {}) {
 async function createGame(mode) {
     let name = document.getElementById('player-name-input').value;
     const count = document.getElementById('player-count-select').value;
+    // Read the checkbox
+    const isPublic = document.getElementById('public-check').checked;
     
-    // Single Player Convenience: Auto-name if empty
     if (count == 1 && !name) name = "Me";
-    
     if (!name) return alert("Please enter your name!");
 
-    const res = await api('/api/create', { mode, maxPlayers: count, playerName: name });
+    // Send isPublic to server
+    const res = await api('/api/create', { mode, maxPlayers: count, playerName: name, isPublic });
     if (res.success) enterGame(res.roomCode);
+}
+
+// --- NEW BROWSER FUNCTIONS ---
+
+async function browseGames() {
+    const name = document.getElementById('player-name-input').value;
+    if (!name) return alert("Please enter your name first!");
+
+    const browser = document.getElementById('browser-area');
+    const list = document.getElementById('public-games-list');
+    
+    browser.classList.remove('hidden');
+    list.innerHTML = "Loading...";
+
+    const res = await fetch('/api/list').then(r => r.json());
+
+    list.innerHTML = ""; // Clear loading text
+
+    if (res.success && res.games.length > 0) {
+        res.games.forEach(g => {
+            const btn = document.createElement('button');
+            // Style: "HostName (2/4) - SFW"
+            btn.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>${g.hostName}'s Room</span>
+                    <span style="font-size:0.8em; background: rgba(0,0,0,0.2); padding: 2px 8px; border-radius: 10px;">
+                        ${g.playerCount}/${g.maxPlayers}
+                    </span>
+                </div>
+                <div style="font-size: 0.7em; opacity: 0.8; text-align: left;">
+                    ${g.mode.toUpperCase()} • Code: ${g.roomCode}
+                </div>
+            `;
+            btn.className = g.mode === 'nsfw' ? 'btn-danger' : 'btn-primary';
+            btn.style.padding = "10px";
+            btn.onclick = () => joinPublicGame(g.roomCode);
+            list.appendChild(btn);
+        });
+    } else {
+        list.innerHTML = "<p>No public games found. Create one!</p>";
+    }
+}
+
+function joinPublicGame(code) {
+    document.getElementById('room-code-input').value = code;
+    joinGame(); // Reuse existing join logic
+}
+
+function closeBrowser() {
+    document.getElementById('browser-area').classList.add('hidden');
 }
 
 async function joinGame() {
