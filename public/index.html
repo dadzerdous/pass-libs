@@ -69,10 +69,14 @@
             </div>
         </div>
 
-        <div id="view-game" class="hidden fade-in">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 id="room-display" class="room-badge">Room: ????</h2>
-                <button id="toggle-context-btn" onclick="toggleContext()" style="width:auto; padding:5px 10px; font-size:0.8em;">Show Full Story</button>
+<div id="view-game" class="hidden fade-in">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                <h2 id="room-display" class="room-badge" style="margin:0;">Room: ????</h2>
+                
+                <div style="display:flex; gap:5px;">
+                    <button onclick="leaveGame()" class="btn-secondary" style="width:auto; padding:5px 10px; font-size:0.8em; background:#e74c3c;">Exit</button>
+                    <button id="toggle-context-btn" onclick="toggleContext()" style="width:auto; padding:5px 10px; font-size:0.8em;">Show Story</button>
+                </div>
             </div>
 
             <div class="card game-card">
