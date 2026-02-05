@@ -24,7 +24,7 @@
                 
                 <hr>
 
-                <h3>2. Start New Game</h3>
+<h3>2. Start New Game</h3>
                 <div class="select-wrapper">
                     <select id="player-count-select">
                         <option value="1">1 Player (Solo)</option>
@@ -33,6 +33,14 @@
                         <option value="4">4 Players</option>
                     </select>
                 </div>
+                
+                <div style="margin-bottom: 15px; text-align: left; padding-left: 10px;">
+                    <label style="font-family: var(--font-head); font-size: 1.2rem;">
+                        <input type="checkbox" id="public-check" style="width: auto; transform: scale(1.5); margin-right: 10px;">
+                        Make Public Lobby?
+                    </label>
+                </div>
+
                 <div class="button-row">
                     <button onclick="createGame('sfw')" class="btn-primary">New Game</button>
                     <button onclick="createGame('nsfw')" class="btn-danger">18+ Mode</button>
@@ -44,6 +52,14 @@
                 <div class="join-row">
                     <input type="text" id="room-code-input" placeholder="CODE">
                     <button onclick="joinGame()" class="btn-secondary">Join</button>
+                </div>
+                
+                <button onclick="browseGames()" class="btn-primary" style="background-color: #f39c12; margin-top: 10px;">🔍 Browse Public Games</button>
+                
+                <div id="browser-area" class="hidden" style="margin-top: 15px;">
+                    <h4>Open Lobbies:</h4>
+                    <div id="public-games-list" class="grid-buttons" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    <button onclick="closeBrowser()" class="btn-secondary" style="margin-top:10px; font-size: 0.8em;">Close List</button>
                 </div>
             </div>
         </div>
