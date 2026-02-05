@@ -43,7 +43,7 @@ const CPU_VOCAB = ["SPATULA", "MOIST", "GRANDMA", "EXPLOSION", "SLIPPERY", "BANA
 
 function generateId() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
 
-/ --- API ENDPOINTS ---
+// --- API ENDPOINTS ---
 
 app.post('/api/create', async (req, res) => {
     const { mode, playerId, playerName, maxPlayers, isPublic } = req.body; // Added isPublic
