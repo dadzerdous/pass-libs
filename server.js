@@ -110,6 +110,33 @@ app.get('/api/list', async (req, res) => {
         res.json({ success: false, error: "Could not fetch games" });
     }
 });
+app.post('/api/join', async (req, res) => {
+    const { roomCode, playerId, playerName } = req.body;
+    const gameRef = db.collection('games').doc(roomCode);
+    const doc = await gameRef.get();
+
+    if (!doc.exists) {
+        return res.json({ success: false, error: "Room not found" });
+    }
+
+    const game = doc.data();
+
+    if (game.players.length >= game.maxPlayers) {
+        return res.json({ success: false, error: "Room is full" });
+    }
+
+    if (!game.players.includes(playerId)) {
+        game.players.push(playerId);
+        game.names[playerId] = playerName || "Player";
+
+        await gameRef.update({
+            players: game.players,
+            names: game.names
+        });
+    }
+
+    res.json({ success: true });
+});
 
 app.post('/api/start', async (req, res) => {
     const { roomCode } = req.body;
