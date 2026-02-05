@@ -1,0 +1,31 @@
+{
+  "sfw": [
+    {
+      "title": "The Bakery",
+      "text": "I went to the bakery to buy a {adjective} {noun}. The baker told me to {verb} away.",
+      "blanks": ["adjective", "noun", "verb"]
+    },
+    {
+      "title": "Zoo Trip",
+      "text": "The {animal} was looking very {adjective} today. It loved to eat {food}.",
+      "blanks": ["animal", "adjective", "food"]
+    },
+    {
+      "title": "The Tech CEO",
+      "text": "I invented a new App called {noun} that tracks your {noun}. It is worth {number} dollars.",
+      "blanks": ["noun", "noun", "number"]
+    }
+  ],
+  "nsfw": [
+    {
+      "title": "Date Night",
+      "text": "My date pulled out a {adjective} {noun}. I immediately {verb}.",
+      "blanks": ["adjective", "noun", "verb"]
+    },
+    {
+      "title": "HR Violation",
+      "text": "I was fired for bringing a {adjective} {noun} to the office party.",
+      "blanks": ["adjective", "noun"]
+    }
+  ]
+}
