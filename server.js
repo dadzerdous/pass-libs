@@ -7,13 +7,17 @@ const admin = require('firebase-admin');
 
 // Load the secret key we uploaded to Render
 try {
-    const serviceAccount = JSON.parse(fs.readFileSync('./firebase-key.json', 'utf8'));
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-    console.log("🔥 Firebase Connected!");
+    if (fs.existsSync('./firebase-key.json')) {
+        const serviceAccount = JSON.parse(fs.readFileSync('./firebase-key.json', 'utf8'));
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
+        console.log("🔥 Firebase Connected!");
+    } else {
+        console.log("⚠️ No firebase-key.json found! Games will not save.");
+    }
 } catch (e) {
-    console.error("❌ Failed to connect to Firebase. Did you upload firebase-key.json to Render?", e);
+    console.error("❌ Firebase Error:", e);
 }
 
 const db = admin.firestore();
@@ -65,7 +69,7 @@ app.post('/api/create', async (req, res) => {
         roundSubmissions: [],   
         roundVotes: {},         
         candidates: [],
-        createdAt: admin.firestore.FieldValue.serverTimestamp() // Auto-delete old games later if we want
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
 
     // SAVE TO FIREBASE
@@ -106,7 +110,6 @@ app.post('/api/join', async (req, res) => {
 app.post('/api/start', async (req, res) => {
     const { roomCode } = req.body;
     const gameRef = db.collection('games').doc(roomCode);
-    // Force start
     await gameRef.update({
         phase: 'writing'
     });
@@ -122,7 +125,6 @@ app.post('/api/replay', async (req, res) => {
     const game = doc.data();
     const category = game.mode === 'nsfw' ? TEMPLATES.nsfw : TEMPLATES.sfw;
     
-    // Reset Logic
     await gameRef.update({
         template: category[Math.floor(Math.random() * category.length)],
         currentBlankIndex: 0,
@@ -148,7 +150,6 @@ app.get('/api/game/:code', async (req, res) => {
     const hasSubmitted = game.roundSubmissions ? game.roundSubmissions.some(s => s.playerId === playerId) : false;
     const hasVoted = game.roundVotes ? (game.roundVotes[playerId] !== undefined) : false;
 
-    // Send data to client
     res.json({
         status: game.status,
         phase: game.phase,
@@ -174,7 +175,6 @@ app.post('/api/submit', async (req, res) => {
     let { roomCode, word, playerId } = req.body;
     const gameRef = db.collection('games').doc(roomCode);
     
-    // We use a "Transaction" to prevent race conditions (two people submitting at exact same time)
     await db.runTransaction(async (t) => {
         const doc = await t.get(gameRef);
         if (!doc.exists) throw "Game not found";
@@ -183,21 +183,17 @@ app.post('/api/submit', async (req, res) => {
         if (game.phase !== 'writing') return;
         if (game.roundSubmissions.some(s => s.playerId === playerId)) return;
 
-        // Add Submission
         word = word.trim().toUpperCase();
         game.roundSubmissions.push({ playerId, word });
 
-        // Check Round End
         if (game.roundSubmissions.length >= game.maxPlayers) {
             if (game.maxPlayers === 1) {
-                 // Single Player
                  const entry = game.roundSubmissions[0];
                  game.answers.push({ word: entry.word, authorId: entry.playerId });
                  game.currentBlankIndex++;
                  game.roundSubmissions = [];
                  if (game.currentBlankIndex >= game.template.blanks.length) game.status = 'finished';
             } else {
-                 // Multiplayer
                  game.phase = 'voting';
                  const cpuWord = CPU_VOCAB[Math.floor(Math.random() * CPU_VOCAB.length)];
                  game.roundSubmissions.push({ playerId: 'CPU', word: cpuWord });
@@ -223,14 +219,10 @@ app.post('/api/vote', async (req, res) => {
 
         if (game.phase !== 'voting') return;
         
-        // Record Vote
-        // (If roundVotes doesn't exist yet, init it)
         if (!game.roundVotes) game.roundVotes = {};
         game.roundVotes[playerId] = candidateIndex;
 
-        // Check Vote End
         if (Object.keys(game.roundVotes).length >= game.maxPlayers) {
-            // Tally
             const scores = new Array(game.candidates.length).fill(0);
             Object.values(game.roundVotes).forEach(index => { if (scores[index] !== undefined) scores[index]++; });
             
@@ -243,7 +235,7 @@ app.post('/api/vote', async (req, res) => {
             game.phase = 'writing';
             game.roundSubmissions = [];
             game.candidates = [];
-            game.roundVotes = {}; // Clear votes
+            game.roundVotes = {}; 
             
             if (game.currentBlankIndex >= game.template.blanks.length) { game.status = 'finished'; }
         }
