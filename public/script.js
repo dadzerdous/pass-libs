@@ -12,10 +12,14 @@ async function api(endpoint, data = {}) {
 }
 
 async function createGame(mode) {
-    const name = document.getElementById('player-name-input').value;
+    let name = document.getElementById('player-name-input').value;
+    const count = document.getElementById('player-count-select').value;
+    
+    // Single Player Convenience: Auto-name if empty
+    if (count == 1 && !name) name = "Me";
+    
     if (!name) return alert("Please enter your name!");
 
-    const count = document.getElementById('player-count-select').value;
     const res = await api('/api/create', { mode, maxPlayers: count, playerName: name });
     if (res.success) enterGame(res.roomCode);
 }
@@ -30,6 +34,15 @@ async function joinGame() {
         if (res.success) enterGame(code);
         else alert("Room not found");
     }
+}
+
+async function forceStart() {
+    await api('/api/start', { roomCode: currentRoom });
+}
+
+async function startReplay() {
+    await api('/api/replay', { roomCode: currentRoom });
+    // Don't need to do anything else, the polling will catch the reset
 }
 
 function enterGame(roomCode) {
@@ -48,6 +61,9 @@ async function pollGame() {
     if (res.status === 'finished') {
         showResult(res.completedText);
     } else {
+        // If we were at result screen, but status is now playing, switch back!
+        document.getElementById('view-result').classList.add('hidden');
+        document.getElementById('view-game').classList.remove('hidden');
         updateGameUI(res);
     }
 }
@@ -59,6 +75,7 @@ function updateGameUI(state) {
     const votingArea = document.getElementById('voting-area');
     const waitMsg = document.getElementById('wait-message');
     const prompt = document.getElementById('prompt-display');
+    const forceBtn = document.getElementById('force-start-btn');
 
     // Reset visibility
     lobbyArea.classList.add('hidden');
@@ -71,6 +88,14 @@ function updateGameUI(state) {
         lobbyArea.classList.remove('hidden');
         document.getElementById('player-status').innerText = `${state.connectedPlayers} / ${state.maxPlayers} Joined`;
         document.getElementById('player-list').innerHTML = state.playerNames.map(name => `• ${name}`).join('<br>');
+        
+        // Show Start Button ONLY if Host
+        if (state.isHost) {
+            forceBtn.classList.remove('hidden');
+        } else {
+            forceBtn.classList.add('hidden');
+        }
+
     } else {
         gameplayArea.classList.remove('hidden');
         if (state.phase === 'writing') {
@@ -97,12 +122,11 @@ function updateGameUI(state) {
 
 function renderCandidates(candidates) {
     const list = document.getElementById('candidates-list');
-    list.innerHTML = ''; // Clear old buttons
-    
+    list.innerHTML = ''; 
     candidates.forEach((word, index) => {
         const btn = document.createElement('button');
         btn.innerText = word;
-        btn.className = 'btn-secondary'; // Use gray style for options
+        btn.className = 'btn-secondary'; 
         btn.onclick = () => submitVote(index);
         list.appendChild(btn);
     });
@@ -127,7 +151,7 @@ async function submitVote(index) {
 }
 
 function showResult(text) {
-    currentRoom = null;
+    // Keep currentRoom active so we can replay
     document.getElementById('view-game').classList.add('hidden');
     document.getElementById('view-result').classList.remove('hidden');
     document.getElementById('story-content').innerHTML = text;
