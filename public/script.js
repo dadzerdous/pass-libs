@@ -1,12 +1,23 @@
 let currentRoom = null;
-const BASE_URL = "https://pass-libs.onrender.com";
 const myPlayerId = localStorage.getItem('pid') || Math.random().toString(36).substring(7);
 localStorage.setItem('pid', myPlayerId);
 
+// 📖 HELPER DICTIONARY
+const VOCAB_GUIDE = {
+    "noun": "Person, place, or thing (e.g., Table, London, Cat)",
+    "verb": "Action word (e.g., Run, Jump, Eat)",
+    "adjective": "Descriptive word (e.g., Sticky, Blue, Fast)",
+    "number": "Any number (e.g., 42, One Million)",
+    "body part": "e.g., Elbow, Nose",
+    "food": "e.g., Pizza, Slime",
+    "animal": "e.g., Giraffe, Ant"
+};
+
+let showContext = false; // Toggle state
+
 async function api(endpoint, data = {}) {
     data.playerId = myPlayerId; 
-    // We add BASE_URL so it knows where to find the server
-    return fetch(BASE_URL + endpoint, { 
+    return fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -16,18 +27,14 @@ async function api(endpoint, data = {}) {
 async function createGame(mode) {
     let name = document.getElementById('player-name-input').value;
     const count = document.getElementById('player-count-select').value;
-    // Read the checkbox
     const isPublic = document.getElementById('public-check').checked;
     
     if (count == 1 && !name) name = "Me";
     if (!name) return alert("Please enter your name!");
 
-    // Send isPublic to server
     const res = await api('/api/create', { mode, maxPlayers: count, playerName: name, isPublic });
     if (res.success) enterGame(res.roomCode);
 }
-
-// --- NEW BROWSER FUNCTIONS ---
 
 async function browseGames() {
     const name = document.getElementById('player-name-input').value;
@@ -41,12 +48,11 @@ async function browseGames() {
 
     const res = await fetch('/api/list').then(r => r.json());
 
-    list.innerHTML = ""; // Clear loading text
+    list.innerHTML = ""; 
 
     if (res.success && res.games.length > 0) {
         res.games.forEach(g => {
             const btn = document.createElement('button');
-            // Style: "HostName (2/4) - SFW"
             btn.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span>${g.hostName}'s Room</span>
@@ -70,7 +76,7 @@ async function browseGames() {
 
 function joinPublicGame(code) {
     document.getElementById('room-code-input').value = code;
-    joinGame(); // Reuse existing join logic
+    joinGame(); 
 }
 
 function closeBrowser() {
@@ -85,7 +91,7 @@ async function joinGame() {
     if (code.length === 4) {
         const res = await api('/api/join', { roomCode: code, playerName: name });
         if (res.success) enterGame(code);
-        else alert("Room not found");
+        else alert(res.error || "Room not found");
     }
 }
 
@@ -95,7 +101,6 @@ async function forceStart() {
 
 async function startReplay() {
     await api('/api/replay', { roomCode: currentRoom });
-    // Don't need to do anything else, the polling will catch the reset
 }
 
 function enterGame(roomCode) {
@@ -112,9 +117,11 @@ async function pollGame() {
     const res = await fetch(`/api/game/${currentRoom}?playerId=${myPlayerId}`).then(r => r.json());
 
     if (res.status === 'finished') {
-        showResult(res.completedText);
+        // Only trigger result view if we aren't already there
+        if (document.getElementById('view-result').classList.contains('hidden')) {
+            showResult(res.completedText);
+        }
     } else {
-        // If we were at result screen, but status is now playing, switch back!
         document.getElementById('view-result').classList.add('hidden');
         document.getElementById('view-game').classList.remove('hidden');
         updateGameUI(res);
@@ -129,6 +136,9 @@ function updateGameUI(state) {
     const waitMsg = document.getElementById('wait-message');
     const prompt = document.getElementById('prompt-display');
     const forceBtn = document.getElementById('force-start-btn');
+    const vocabHint = document.getElementById('vocab-hint');
+    const contextBox = document.getElementById('context-box');
+    const contextText = document.getElementById('context-text');
 
     // Reset visibility
     lobbyArea.classList.add('hidden');
@@ -142,26 +152,37 @@ function updateGameUI(state) {
         document.getElementById('player-status').innerText = `${state.connectedPlayers} / ${state.maxPlayers} Joined`;
         document.getElementById('player-list').innerHTML = state.playerNames.map(name => `• ${name}`).join('<br>');
         
-        // Show Start Button ONLY if Host
-        if (state.isHost) {
-            forceBtn.classList.remove('hidden');
-        } else {
-            forceBtn.classList.add('hidden');
-        }
+        if (state.isHost) forceBtn.classList.remove('hidden');
+        else forceBtn.classList.add('hidden');
 
     } else {
         gameplayArea.classList.remove('hidden');
+        
+        // CONTEXT TOGGLE LOGIC
+        if (showContext) {
+            contextBox.classList.remove('hidden');
+            contextText.innerHTML = state.maskedStory;
+        } else {
+            contextBox.classList.add('hidden');
+        }
+
         if (state.phase === 'writing') {
             if (state.hasSubmitted) {
                 waitMsg.classList.remove('hidden');
                 waitMsg.innerText = `Waiting for players... (${state.submittedCount}/${state.maxPlayers})`;
                 prompt.innerText = "Submitted!";
+                vocabHint.innerText = "";
             } else {
                 inputArea.classList.remove('hidden');
-                prompt.innerText = `Enter a: ${state.currentBlank.toUpperCase()}`;
+                const wordType = state.currentBlank.toLowerCase();
+                prompt.innerText = `Enter a: ${wordType.toUpperCase()}`;
+                
+                // Show Helper Text
+                vocabHint.innerText = VOCAB_GUIDE[wordType] || "";
             }
         } else if (state.phase === 'voting') {
             prompt.innerText = "Vote for your favorite!";
+            vocabHint.innerText = "";
             if (state.hasVoted) {
                 waitMsg.classList.remove('hidden');
                 waitMsg.innerText = `Waiting for votes... (${state.voteCount}/${state.maxPlayers})`;
@@ -171,6 +192,13 @@ function updateGameUI(state) {
             }
         }
     }
+}
+
+function toggleContext() {
+    showContext = !showContext;
+    const btn = document.getElementById('toggle-context-btn');
+    btn.innerText = showContext ? "Hide Full Story" : "Show Full Story";
+    pollGame(); // Force refresh UI
 }
 
 function renderCandidates(candidates) {
@@ -186,12 +214,19 @@ function renderCandidates(candidates) {
 }
 
 async function submitWord() {
-    const word = document.getElementById('word-input').value;
+    const wordInput = document.getElementById('word-input');
+    const word = wordInput.value.trim();
+    
+    // NO SPACES ALLOWED CHECK
     if (!word) return;
+    if (word.includes(' ')) {
+        alert("Single words only! No spaces.");
+        return;
+    }
     
     const res = await api('/api/submit', { roomCode: currentRoom, word });
     if (res.success) {
-        document.getElementById('word-input').value = '';
+        wordInput.value = '';
         pollGame(); 
     }
 }
@@ -203,9 +238,49 @@ async function submitVote(index) {
     }
 }
 
+// 🎭 READER MODE
+let storySentences = [];
+let storyIndex = 0;
+
 function showResult(text) {
-    // Keep currentRoom active so we can replay
     document.getElementById('view-game').classList.add('hidden');
     document.getElementById('view-result').classList.remove('hidden');
-    document.getElementById('story-content').innerHTML = text;
+    
+    // Split text by punctuation (. ! ?)
+    // This regex splits but keeps the delimiter
+    const rawSentences = text.match(/[^\.!\?]+[\.!\?]+/g) || [text];
+    storySentences = rawSentences.map(s => s.trim());
+    storyIndex = 0;
+    
+    const container = document.getElementById('story-content');
+    container.innerHTML = ""; // Clear old
+    
+    // Create the "Tap to Reveal" button
+    const nextBtn = document.createElement('button');
+    nextBtn.id = "reveal-btn";
+    nextBtn.className = "btn-primary big-btn pulse";
+    nextBtn.innerText = "👆 Tap to Reveal Story";
+    nextBtn.onclick = revealNextSentence;
+    
+    container.appendChild(nextBtn);
+}
+
+function revealNextSentence() {
+    const container = document.getElementById('story-content');
+    const btn = document.getElementById('reveal-btn');
+    
+    if (storyIndex < storySentences.length) {
+        const p = document.createElement('p');
+        p.className = "fade-in";
+        p.innerHTML = storySentences[storyIndex];
+        p.style.marginBottom = "15px";
+        container.insertBefore(p, btn); // Add text BEFORE the button
+        storyIndex++;
+        
+        btn.innerText = "Next Line...";
+        
+        if (storyIndex >= storySentences.length) {
+            btn.remove(); // Remove button at end
+        }
+    }
 }
