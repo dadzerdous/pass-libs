@@ -14,10 +14,12 @@ const games = {};
 const TEMPLATES = {
     sfw: [
         { title: "The Bakery", text: "I bought a {adjective} {noun}. The baker told me to {verb} away.", blanks: ["adjective", "noun", "verb"] },
-        { title: "Zoo Trip", text: "The {animal} was looking very {adjective} today.", blanks: ["animal", "adjective"] }
+        { title: "Zoo Trip", text: "The {animal} was looking very {adjective} today.", blanks: ["animal", "adjective"] },
+        { title: "The Tech CEO", text: "I invented a new App called {noun} that tracks your {noun}. It is worth {number} dollars.", blanks: ["noun", "noun", "number"] }
     ],
     nsfw: [
-        { title: "Date Night", text: "My date pulled out a {adjective} {noun}. I immediately {verb}.", blanks: ["adjective", "noun", "verb"] }
+        { title: "Date Night", text: "My date pulled out a {adjective} {noun}. I immediately {verb}.", blanks: ["adjective", "noun", "verb"] },
+        { title: "HR Violation", text: "I was fired for bringing a {adjective} {noun} to the office party.", blanks: ["adjective", "noun"] }
     ]
 };
 
@@ -32,17 +34,22 @@ app.post('/api/create', (req, res) => {
     const roomCode = generateId();
     const category = mode === 'nsfw' ? TEMPLATES.nsfw : TEMPLATES.sfw;
     
+    // SINGLE PLAYER: Skip Lobby, default name if missing
+    const isSinglePlayer = parseInt(maxPlayers) === 1;
+    const initialPhase = isSinglePlayer ? 'writing' : 'lobby';
+    
     games[roomCode] = {
         id: roomCode,
         mode: mode,
         template: category[Math.floor(Math.random() * category.length)],
         maxPlayers: parseInt(maxPlayers) || 2,
         players: [playerId],
-        names: { [playerId]: playerName },
+        names: { [playerId]: playerName || "You" },
+        hostId: playerId, // Track who created it
         
         currentBlankIndex: 0,
         status: 'playing',
-        phase: 'lobby',       // START IN LOBBY
+        phase: initialPhase,
         
         answers: [],            
         roundSubmissions: [],   
@@ -63,11 +70,43 @@ app.post('/api/join', (req, res) => {
         if (playerName) game.names[playerId] = playerName;
     }
 
-    // AUTO-START GAME IF LOBBY IS FULL
+    // AUTO-START if full
     if (game.phase === 'lobby' && game.players.length >= game.maxPlayers) {
         game.phase = 'writing';
     }
 
+    res.json({ success: true });
+});
+
+// FORCE START (New!)
+app.post('/api/start', (req, res) => {
+    const { roomCode } = req.body;
+    const game = games[roomCode];
+    if (game) {
+        game.phase = 'writing'; // Force start
+        game.maxPlayers = game.players.length; // Lock in current player count
+    }
+    res.json({ success: true });
+});
+
+// REPLAY (New!)
+app.post('/api/replay', (req, res) => {
+    const { roomCode } = req.body;
+    const game = games[roomCode];
+    if (game) {
+        // Pick new template
+        const category = game.mode === 'nsfw' ? TEMPLATES.nsfw : TEMPLATES.sfw;
+        game.template = category[Math.floor(Math.random() * category.length)];
+        
+        // Reset State
+        game.currentBlankIndex = 0;
+        game.status = 'playing';
+        game.phase = 'writing';
+        game.answers = [];
+        game.roundSubmissions = [];
+        game.roundVotes = {};
+        game.candidates = [];
+    }
     res.json({ success: true });
 });
 
@@ -89,7 +128,8 @@ app.get('/api/game/:code', (req, res) => {
         
         connectedPlayers: game.players.length,
         maxPlayers: game.maxPlayers,
-        playerNames: Object.values(game.names), // Send list of names for lobby
+        playerNames: Object.values(game.names),
+        isHost: game.hostId === playerId, // Tell client if they are the boss
         
         submittedCount: game.roundSubmissions.length,
         hasSubmitted: hasSubmitted,
@@ -106,12 +146,26 @@ app.post('/api/submit', (req, res) => {
     if (game.roundSubmissions.some(s => s.playerId === playerId)) return res.json({ success: false, error: "Already submitted" });
 
     game.roundSubmissions.push({ playerId, word });
+    
+    // Check if we should move to voting
+    // Single player: Move instantly
+    // Multiplayer: Move when everyone submitted
     if (game.roundSubmissions.length >= game.maxPlayers) {
-        game.phase = 'voting';
-        const cpuWord = CPU_VOCAB[Math.floor(Math.random() * CPU_VOCAB.length)];
-        game.roundSubmissions.push({ playerId: 'CPU', word: cpuWord });
-        game.candidates = game.roundSubmissions.sort(() => Math.random() - 0.5);
-        game.roundVotes = {};
+        if (game.maxPlayers === 1) {
+             // Single Player -> Skip voting, just save it
+             const entry = game.roundSubmissions[0];
+             game.answers.push({ word: entry.word, authorId: entry.playerId });
+             game.currentBlankIndex++;
+             game.roundSubmissions = [];
+             if (game.currentBlankIndex >= game.template.blanks.length) game.status = 'finished';
+        } else {
+             // Multiplayer -> Go to voting
+             game.phase = 'voting';
+             const cpuWord = CPU_VOCAB[Math.floor(Math.random() * CPU_VOCAB.length)];
+             game.roundSubmissions.push({ playerId: 'CPU', word: cpuWord });
+             game.candidates = game.roundSubmissions.sort(() => Math.random() - 0.5);
+             game.roundVotes = {};
+        }
     }
     res.json({ success: true });
 });
