@@ -4,72 +4,80 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pass-Libs</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Patrick+Hand&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <div class="app-container">
-        <h1>Pass-Libs</h1>
+        <h1 class="logo">Pass-Libs ✏️</h1>
         
-        <div id="view-menu">
-            <h3>1. Who are you?</h3>
-            <input type="text" id="player-name-input" placeholder="Enter Your Name (Optional for Solo)">
-            
-            <hr>
+        <div id="view-menu" class="fade-in">
+            <div class="card">
+                <h3>1. Who are you?</h3>
+                <input type="text" id="player-name-input" placeholder="Your Name" spellcheck="false">
+                
+                <hr>
 
-            <h3>2. Start New Game</h3>
-            <label>Players:</label>
-            <select id="player-count-select">
-                <option value="1">1 Player (Solo)</option>
-                <option value="2" selected>2 Players</option>
-                <option value="3">3 Players</option>
-                <option value="4">4 Players</option>
-            </select>
-            <br><br>
-            <button onclick="createGame('sfw')" class="btn-primary">Create SFW Game</button>
-            <button onclick="createGame('nsfw')" class="btn-danger">Create 18+ Game</button>
-            
-            <hr>
-            
-            <h3>OR Join Game</h3>
-            <input type="text" id="room-code-input" placeholder="4-LETTER CODE">
-            <button onclick="joinGame()" class="btn-secondary">Join Game</button>
+                <h3>2. Start New Game</h3>
+                <div class="select-wrapper">
+                    <select id="player-count-select">
+                        <option value="1">1 Player (Solo)</option>
+                        <option value="2" selected>2 Players</option>
+                        <option value="3">3 Players</option>
+                        <option value="4">4 Players</option>
+                    </select>
+                </div>
+                <div class="button-row">
+                    <button onclick="createGame('sfw')" class="btn-primary">New Game</button>
+                    <button onclick="createGame('nsfw')" class="btn-danger">18+ Mode</button>
+                </div>
+                
+                <hr>
+                
+                <h3>OR Join Game</h3>
+                <div class="join-row">
+                    <input type="text" id="room-code-input" placeholder="CODE">
+                    <button onclick="joinGame()" class="btn-secondary">Join</button>
+                </div>
+            </div>
         </div>
 
-        <div id="view-game" class="hidden">
-            <h2 id="room-display">Room: ????</h2>
-            <div class="card">
+        <div id="view-game" class="hidden fade-in">
+            <h2 id="room-display" class="room-badge">Room: ????</h2>
+            <div class="card game-card">
                 <div id="lobby-area" class="hidden">
                     <h3>Waiting for Players...</h3>
                     <p id="player-status">1 / 2 Players Joined</p>
-                    <div id="player-list" style="text-align: left; padding: 10px; border-top: 1px solid #ccc;"></div>
-                    <br>
-                    <button id="force-start-btn" onclick="forceStart()" class="btn-danger hidden">Start Game Now!</button>
+                    <div id="player-list"></div>
+                    <button id="force-start-btn" onclick="forceStart()" class="btn-danger hidden">Start Now!</button>
                 </div>
 
                 <div id="gameplay-area" class="hidden">
                     <h3 id="prompt-display">Loading...</h3>
                     
                     <div id="input-area">
-                        <input type="text" id="word-input" placeholder="Type here..." spellcheck="true" autocapitalize="characters">
-                        <button onclick="submitWord()" class="btn-primary">Submit</button>
+                        <input type="text" id="word-input" placeholder="TYPE HERE..." spellcheck="true" autocapitalize="characters">
+                        <button onclick="submitWord()" class="btn-primary big-btn">SUBMIT</button>
                     </div>
 
                     <div id="voting-area" class="hidden">
-                        <p>Vote for the best answer:</p>
-                        <div id="candidates-list"></div>
+                        <p class="instruction">Vote for the funniest:</p>
+                        <div id="candidates-list" class="grid-buttons"></div>
                     </div>
                 </div>
 
-                <p id="wait-message" class="hidden">Waiting...</p>
+                <p id="wait-message" class="hidden pulse">Waiting...</p>
             </div>
         </div>
 
-        <div id="view-result" class="hidden">
+        <div id="view-result" class="hidden fade-in">
             <h2>The Story</h2>
-            <div id="story-content" class="story-box"></div>
-            <button onclick="startReplay()" class="btn-primary">Play Another Round (Same Group)</button>
-            <button onclick="location.reload()" class="btn-secondary">Exit to Menu</button>
+            <div id="story-content" class="story-box paper-texture"></div>
+            <div class="button-row">
+                <button onclick="startReplay()" class="btn-primary">Play Again</button>
+                <button onclick="location.reload()" class="btn-secondary">Exit</button>
+            </div>
         </div>
 
     </div>
