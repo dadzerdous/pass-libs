@@ -115,23 +115,24 @@ app.post('/api/join', async (req, res) => {
     const gameRef = db.collection('games').doc(roomCode);
     const doc = await gameRef.get();
 
-    if (!doc.exists) {
-        return res.json({ success: false, error: "Room not found" });
-    }
+    if (!doc.exists) return res.json({ success: false, error: "Game not found" });
+    let game = doc.data();
 
-    const game = doc.data();
-
-    if (game.players.length >= game.maxPlayers) {
-        return res.json({ success: false, error: "Room is full" });
-    }
-
+    // Logic: Add player
     if (!game.players.includes(playerId)) {
         game.players.push(playerId);
-        game.names[playerId] = playerName || "Player";
-
+        if (playerName) game.names[playerId] = playerName;
+        
+        // Auto-start check
+        if (game.phase === 'lobby' && game.players.length >= game.maxPlayers) {
+            game.phase = 'writing';
+        }
+        
+        // Update DB
         await gameRef.update({
             players: game.players,
-            names: game.names
+            names: game.names,
+            phase: game.phase
         });
     }
 
