@@ -1,10 +1,12 @@
 let currentRoom = null;
+const BASE_URL = "https://pass-libs.onrender.com";
 const myPlayerId = localStorage.getItem('pid') || Math.random().toString(36).substring(7);
 localStorage.setItem('pid', myPlayerId);
 
 async function api(endpoint, data = {}) {
     data.playerId = myPlayerId; 
-    return fetch(endpoint, {
+    // We add BASE_URL so it knows where to find the server
+    return fetch(BASE_URL + endpoint, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
