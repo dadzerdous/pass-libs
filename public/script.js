@@ -53,36 +53,44 @@ async function pollGame() {
 }
 
 function updateGameUI(state) {
+    const lobbyArea = document.getElementById('lobby-area');
+    const gameplayArea = document.getElementById('gameplay-area');
     const inputArea = document.getElementById('input-area');
     const votingArea = document.getElementById('voting-area');
     const waitMsg = document.getElementById('wait-message');
     const prompt = document.getElementById('prompt-display');
 
-    // HIDE ALL INITIALLY
+    // Reset visibility
+    lobbyArea.classList.add('hidden');
+    gameplayArea.classList.add('hidden');
     inputArea.classList.add('hidden');
     votingArea.classList.add('hidden');
     waitMsg.classList.add('hidden');
 
-    if (state.phase === 'writing') {
-        // --- WRITING PHASE ---
-        if (state.hasSubmitted) {
-            waitMsg.classList.remove('hidden');
-            waitMsg.innerText = `Waiting for players... (${state.submittedCount}/${state.maxPlayers})`;
-            prompt.innerText = "Submitted!";
-        } else {
-            inputArea.classList.remove('hidden');
-            prompt.innerText = `Enter a: ${state.currentBlank.toUpperCase()}`;
-        }
-    } else if (state.phase === 'voting') {
-        // --- VOTING PHASE ---
-        prompt.innerText = "Vote for your favorite!";
-        
-        if (state.hasVoted) {
-            waitMsg.classList.remove('hidden');
-            waitMsg.innerText = `Waiting for votes... (${state.voteCount}/${state.maxPlayers})`;
-        } else {
-            votingArea.classList.remove('hidden');
-            renderCandidates(state.candidates);
+    if (state.phase === 'lobby') {
+        lobbyArea.classList.remove('hidden');
+        document.getElementById('player-status').innerText = `${state.connectedPlayers} / ${state.maxPlayers} Joined`;
+        document.getElementById('player-list').innerHTML = state.playerNames.map(name => `• ${name}`).join('<br>');
+    } else {
+        gameplayArea.classList.remove('hidden');
+        if (state.phase === 'writing') {
+            if (state.hasSubmitted) {
+                waitMsg.classList.remove('hidden');
+                waitMsg.innerText = `Waiting for players... (${state.submittedCount}/${state.maxPlayers})`;
+                prompt.innerText = "Submitted!";
+            } else {
+                inputArea.classList.remove('hidden');
+                prompt.innerText = `Enter a: ${state.currentBlank.toUpperCase()}`;
+            }
+        } else if (state.phase === 'voting') {
+            prompt.innerText = "Vote for your favorite!";
+            if (state.hasVoted) {
+                waitMsg.classList.remove('hidden');
+                waitMsg.innerText = `Waiting for votes... (${state.voteCount}/${state.maxPlayers})`;
+            } else {
+                votingArea.classList.remove('hidden');
+                renderCandidates(state.candidates);
+            }
         }
     }
 }
