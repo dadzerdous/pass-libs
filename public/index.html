@@ -36,19 +36,25 @@
             <button onclick="joinGame()" class="btn-secondary">Join Game</button>
         </div>
 
-        <div id="view-game" class="hidden">
+<div id="view-game" class="hidden">
             <h2 id="room-display">Room: ????</h2>
             <div class="card">
-                <h3 id="prompt-display">Loading...</h3>
-                
-                <div id="input-area">
-                    <input type="text" id="word-input" placeholder="Type here...">
-                    <button onclick="submitWord()" class="btn-primary">Submit</button>
+                <div id="lobby-area" class="hidden">
+                    <h3>Waiting for Players...</h3>
+                    <p id="player-status">1 / 2 Players Joined</p>
+                    <div id="player-list" style="text-align: left; padding: 10px; border-top: 1px solid #ccc;"></div>
                 </div>
 
-                <div id="voting-area" class="hidden">
-                    <p>Vote for the best answer:</p>
-                    <div id="candidates-list"></div>
+                <div id="gameplay-area" class="hidden">
+                    <h3 id="prompt-display">Loading...</h3>
+                    <div id="input-area">
+                        <input type="text" id="word-input" placeholder="Type here...">
+                        <button onclick="submitWord()" class="btn-primary">Submit</button>
+                    </div>
+                    <div id="voting-area" class="hidden">
+                        <p>Vote for the best answer:</p>
+                        <div id="candidates-list"></div>
+                    </div>
                 </div>
 
                 <p id="wait-message" class="hidden">Waiting...</p>
