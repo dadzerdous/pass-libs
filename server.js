@@ -43,10 +43,10 @@ const CPU_VOCAB = ["SPATULA", "MOIST", "GRANDMA", "EXPLOSION", "SLIPPERY", "BANA
 
 function generateId() { return Math.random().toString(36).substring(2, 6).toUpperCase(); }
 
-// --- API ENDPOINTS ---
+/ --- API ENDPOINTS ---
 
 app.post('/api/create', async (req, res) => {
-    const { mode, playerId, playerName, maxPlayers } = req.body;
+    const { mode, playerId, playerName, maxPlayers, isPublic } = req.body; // Added isPublic
     const roomCode = generateId();
     const category = (mode === 'nsfw' && TEMPLATES.nsfw) ? TEMPLATES.nsfw : TEMPLATES.sfw;
     
@@ -62,6 +62,8 @@ app.post('/api/create', async (req, res) => {
         players: [playerId],
         names: { [playerId]: playerName || "You" },
         hostId: playerId,
+        isPublic: !!isPublic, // Save the flag (true/false)
+        
         currentBlankIndex: 0,
         status: 'playing',
         phase: isSinglePlayer ? 'writing' : 'lobby',
@@ -72,39 +74,41 @@ app.post('/api/create', async (req, res) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
 
-    // SAVE TO FIREBASE
     await db.collection('games').doc(roomCode).set(newGame);
 
     res.json({ roomCode, success: true });
 });
 
-app.post('/api/join', async (req, res) => {
-    const { roomCode, playerId, playerName } = req.body;
-    const gameRef = db.collection('games').doc(roomCode);
-    const doc = await gameRef.get();
+// NEW: Get list of Public Games
+app.get('/api/list', async (req, res) => {
+    try {
+        // Find games that are Public AND in the Lobby
+        const snapshot = await db.collection('games')
+            .where('isPublic', '==', true)
+            .where('phase', '==', 'lobby')
+            .limit(10) // Only show top 10 to keep it fast
+            .get();
 
-    if (!doc.exists) return res.json({ success: false, error: "Game not found" });
-    let game = doc.data();
-
-    // Logic: Add player
-    if (!game.players.includes(playerId)) {
-        game.players.push(playerId);
-        if (playerName) game.names[playerId] = playerName;
-        
-        // Auto-start check
-        if (game.phase === 'lobby' && game.players.length >= game.maxPlayers) {
-            game.phase = 'writing';
-        }
-        
-        // Update DB
-        await gameRef.update({
-            players: game.players,
-            names: game.names,
-            phase: game.phase
+        const gamesList = [];
+        snapshot.forEach(doc => {
+            const g = doc.data();
+            // Only show if there is room to join
+            if (g.players.length < g.maxPlayers) {
+                gamesList.push({
+                    roomCode: g.id,
+                    mode: g.mode,
+                    playerCount: g.players.length,
+                    maxPlayers: g.maxPlayers,
+                    hostName: g.names[g.hostId] || "Unknown"
+                });
+            }
         });
-    }
 
-    res.json({ success: true });
+        res.json({ success: true, games: gamesList });
+    } catch (e) {
+        console.error("List Error:", e);
+        res.json({ success: false, error: "Could not fetch games" });
+    }
 });
 
 app.post('/api/start', async (req, res) => {
