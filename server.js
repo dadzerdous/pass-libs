@@ -140,7 +140,58 @@ app.post('/api/join', async (req, res) => {
     
     res.json({ success: false, error: "Room full or started" });
 });
+// --- NEW: Leave / Cancel Endpoint ---
+app.post('/api/leave', async (req, res) => {
+    const { roomCode, playerId } = req.body;
+    const gameRef = db.collection('games').doc(roomCode);
+    
+    await db.runTransaction(async (t) => {
+        const doc = await t.get(gameRef);
+        if (!doc.exists) return; // Already gone
+        const game = doc.data();
 
+        // SCENARIO 1: Host Leaves in Lobby -> DESTROY GAME
+        if (game.phase === 'lobby' && game.hostId === playerId) {
+            t.delete(gameRef); // Delete the room entirely
+        }
+        // SCENARIO 2: Player Leaves in Lobby -> REMOVE PLAYER
+        else if (game.phase === 'lobby') {
+            const newPlayers = game.players.filter(p => p !== playerId);
+            const newNames = { ...game.names };
+            delete newNames[playerId];
+            t.update(gameRef, { players: newPlayers, names: newNames });
+        }
+        // SCENARIO 3: Game in Progress -> DO NOTHING (Allow Rejoin)
+        else {
+            // We don't remove them so they can refresh/rejoin
+        }
+    });
+
+    res.json({ success: true });
+});
+
+// --- NEW: Auto-Cleanup (The Janitor) ---
+// Runs every hour to delete games older than 24 hours
+setInterval(async () => {
+    console.log("🧹 Running Cleanup...");
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
+    
+    // Note: This requires a Firestore Index (Render logs will tell you the URL to create it)
+    try {
+        const snapshot = await db.collection('games')
+            .where('createdAt', '<', admin.firestore.Timestamp.fromDate(yesterday))
+            .get();
+        
+        if (snapshot.empty) return;
+        
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        console.log(`🗑️ Deleted ${snapshot.size} old games.`);
+    } catch (e) {
+        console.log("Cleanup skipped (Index likely building):", e.message);
+    }
+}, 60 * 60 * 1000); // Run every 60 mins
 app.post('/api/start', async (req, res) => {
     const { roomCode } = req.body;
     const gameRef = db.collection('games').doc(roomCode);
