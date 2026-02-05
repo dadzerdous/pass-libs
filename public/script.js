@@ -24,6 +24,15 @@ async function api(endpoint, data = {}) {
     }).then(r => r.json());
 }
 
+async function leaveGame() {
+    if (!currentRoom) return;
+    
+    if (confirm("Are you sure you want to leave?")) {
+        await api('/api/leave', { roomCode: currentRoom });
+        location.reload(); // Refresh to go back to main menu
+    }
+}
+
 async function createGame(mode) {
     let name = document.getElementById('player-name-input').value;
     const count = document.getElementById('player-count-select').value;
@@ -114,17 +123,28 @@ function enterGame(roomCode) {
 
 async function pollGame() {
     if (!currentRoom) return;
-    const res = await fetch(`/api/game/${currentRoom}?playerId=${myPlayerId}`).then(r => r.json());
+    
+    try {
+        const res = await fetch(`/api/game/${currentRoom}?playerId=${myPlayerId}`).then(r => r.json());
 
-    if (res.status === 'finished') {
-        // Only trigger result view if we aren't already there
-        if (document.getElementById('view-result').classList.contains('hidden')) {
-            showResult(res.completedText);
+        // DETECT IF GAME WAS DELETED
+        if (res.error === "Game not found") {
+            alert("The host has disbanded the lobby.");
+            location.reload();
+            return;
         }
-    } else {
-        document.getElementById('view-result').classList.add('hidden');
-        document.getElementById('view-game').classList.remove('hidden');
-        updateGameUI(res);
+
+        if (res.status === 'finished') {
+            if (document.getElementById('view-result').classList.contains('hidden')) {
+                showResult(res.completedText);
+            }
+        } else {
+            document.getElementById('view-result').classList.add('hidden');
+            document.getElementById('view-game').classList.remove('hidden');
+            updateGameUI(res);
+        }
+    } catch (e) {
+        console.log("Polling error:", e);
     }
 }
 
