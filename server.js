@@ -344,8 +344,8 @@ function compileStory(game) {
     let story = game.template.text;
     game.answers.forEach(entry => {
         const authorName = entry.authorId === 'CPU' ? "🤖 Bot" : (game.names[entry.authorId] || "Unknown");
-        // FIXED COLOR HERE vvv
-        const replacement = `<b>${entry.word} <span style="font-size:0.6em; color:#8e44ad;">(${authorName})</span></b>`;
+        // FIXED: Changed 0.6em to 70% to avoid the "Reader Mode" splitting bug
+        const replacement = `<b>${entry.word} <span style="font-size:70%; color:#8e44ad;">(${authorName})</span></b>`;
         story = story.replace(/\{.*?\}/, replacement);
     });
     return story;
