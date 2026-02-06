@@ -29,6 +29,19 @@ app.use(bodyParser.json());
 app.use(express.static('public'));
 app.use(express.static(__dirname));
 
+
+// --- LOAD BAD WORDS ---
+let BAD_WORDS = [];
+try {
+    const data = fs.readFileSync('badwords.json', 'utf8');
+    BAD_WORDS = JSON.parse(data);
+    // Normalize to uppercase just in case
+    BAD_WORDS = BAD_WORDS.map(w => w.toUpperCase());
+    console.log(`🤬 Loaded ${BAD_WORDS.length} bad words.`);
+} catch (err) {
+    console.log("⚠️ No badwords.json found. Filter is empty.");
+    BAD_WORDS = []; 
+}
 // --- TEMPLATES ---
 let TEMPLATES = {};
 try {
