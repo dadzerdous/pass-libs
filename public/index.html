@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#2c3e50">
-    <link rel="apple-touch-icon" href="https://img.icons8.com/doodle/192/000000/pencil--v1.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Patrick+Hand&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -127,12 +127,13 @@
     </div>
 
     <script src="script.js"></script>
-    <script>
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js')
-            .then(() => console.log("Service Worker Registered 👷"))
-            .catch(e => console.log("SW Failed:", e));
-    }
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    .then(() => console.log("Service Worker Registered 👷"))
+    .catch(e => console.log("SW Failed:", e));
+}
 </script>
+
 </body>
 </html>
